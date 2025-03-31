@@ -10,31 +10,7 @@ from matplotlib import pyplot as plt
 
 import torch.nn.functional as F
 
-class Network(nn.Module):
-    '''feed-forward network as a classifier, using ReLU activations and dropout '''
-    def __init__(self, input_units, h1_units, h2_units, output_units):
-        super().__init__()
-        # Defining the layers
-        self.fc1 = nn.Linear(input_units, h1_units)        
-        # Inputs to hidden layer linear transformation
-        self.fc2 = nn.Linear(h1_units, h2_units)
-        # Output layer, 10 units - one for each digit
-        self.output = nn.Linear(h2_units, output_units)
-        
-    def forward(self, x):       
-        ''' Forward pass through the network, returns the output logits '''
-        x = self.fc1(x)
-        x = F.relu(x)
-        x = self.fc2(x)
-        x = F.relu(x)
-        x = self.output(x)
-        x = F.softmax(x, dim=1)
-        
-        return x
-
 def load_checkpoint(model, checkpoint_file, weights_only=True):
-    #model = torch.load(checkpoint_file, weights_only=True)
-    #model = Network()
     model.load_state_dict(torch.load(checkpoint_file))#, weights_only))
     print(model)
     return model
@@ -72,10 +48,7 @@ def imshow(image, ax=None, title=None):
     return ax
 
 def predict(image, model, test_data, classes, topk=5):
-    ''' Predict the class (or classes) of an image using a trained deep learning model.
-    '''    
-    #classes = [ "a", "b", "c", "d", "e"]
-    
+    ''' Predict the class (or classes) of an image using a trained deep learning model '''    
     model.eval()
     
     x = test_data[0][0] # Image tensor
@@ -122,19 +95,17 @@ def test_data(model, test_transforms, sample_image):
     # classification stage
     # set torch to sour item desceningly
     _, indices = torch.sort(out, descending=True)
-    #classify the image
+    # classify the image
     # Assuming indices is a tensor of indices
     top_indices = indices[0][:10].tolist()  # Convert to a list of integers
     print(top_indices)
 
     percentage = torch.nn.functional.softmax(out, dim=1)[0] * 100
-    #[(cat_to_name[idx], percentage[idx].item()) for idx in indices[0][:10]]
-    # Create the percentage list
     percentage_list = [(cat_to_name[idx.item()], percentage[idx].item()) for idx in top_indices]
     print(percentage_list)
 
 def parse_arguments():
-    None# Create Parse using ArgumentParser
+    None # Create Parse using ArgumentParser
     parser = argparse.ArgumentParser()
     
     # parse the different types of arguments
@@ -183,14 +154,10 @@ if __name__ == "__main__":
         cat_to_name = json.load(f)
         
     # Get tensor from image
-    tensor = process_image(image)
-    #type(tensor)
+    tensor = process_image(image)   
     predict(image, model, test_set, cat_to_name, command_args.top_k)
 
-    #Display an image along with the top 5 classes
-    
-    #type(tensor)
-    #ax = imshow(tensor)
-    #flower.show()
+    # Display an image along with the top 5 classes   
+    ax = imshow(tensor)
 
     image.close()

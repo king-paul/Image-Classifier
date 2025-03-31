@@ -107,9 +107,8 @@ def train_model(trainloader, testloader, model, learning_rate = 0.001, epochs = 
         # increment steps every time a batch has been processed
         for images, labels, in trainloader:        
             steps += 1
-            print("step", steps)
+            print("step", steps)            
             
-            #images.unsqueeze(0)
             # move images and labels over to GPU (if available)
             images, labels = images.to(device), labels.to(device)
 
