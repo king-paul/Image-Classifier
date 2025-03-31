@@ -173,5 +173,6 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# image data folers
+# proejct specific data
 flowers/
+*.pth
