@@ -10,18 +10,26 @@ from matplotlib import pyplot as plt
 
 import torch.nn.functional as F
 
-def load_checkpoint(model, checkpoint_file, weights_only=True):
-    model.load_state_dict(torch.load(checkpoint_file))#, weights_only))
-    print(model)
+def load_checkpoint(checkpoint_file):
+    ''' loads the trained model from a checkpoint file and returns it'''
+    checkpoint = torch.load(checkpoint_file)
+
+    model = models.vgg11(pretrained=True)
+    model.load_state_dict(checkpoint)
+    model.classifier = nn.Sequential(nn.Linear(25088, 256),
+                           nn.ReLU(),
+                           nn.Dropout(0.2),
+                           nn.Linear(256, 102),
+                           nn.LogSoftmax(dim=1))
     return model
 
-def process_image(image):
+def process_image(image, test_transforms):
     ''' Scales, crops, and normalizes a PIL image for a PyTorch model,
         returns an Numpy array
     '''    
     # Process a PIL image for use in a PyTorch model    
-    transform = transforms.Compose([transforms.PILToTensor()])
-    tensor = transform(image)
+    transforms.Compose([transforms.PILToTensor()])
+    tensor = test_transforms(image)
     
     return tensor
 
@@ -47,28 +55,27 @@ def imshow(image, ax=None, title=None):
     
     return ax
 
-def predict(image, model, test_data, classes, topk=5):
+def predict(image_tensor, model, classes, topk=5):
     ''' Predict the class (or classes) of an image using a trained deep learning model '''    
     model.eval()
-    
-    x = test_data[0][0] # Image tensor
-    y = test_data[0][1] # Label (class index)
-    
-    # Calculate the class probabilities (softmax) for img
-    ps = torch.exp(model(image))
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    model.to(device)
+    image_tensor = image_tensor.to(device)
     
     with torch.no_grad():
-        x = x.unsqueeze(0)  # Now shape will be [1, 3, 224, 224]
-
-        x = x.to(device)
-        prediction = model(x)
         
-        predicted = classes[prediction[0].argmax(0)]
-        actual = classes[y]
+        image_tensor = image_tensor.unsqueeze(0)  # Add batch dimension
+        logps = model(image_tensor)
+        ps = torch.exp(logps)
+        top_p, top_class = ps.topk(topk, dim=1)
         
-        print(f"Predicted {predicted}, Actual: {actual}")
-    
-    return ps, classes
+        top_p = top_p.cpu().numpy()[0]
+        top_class = top_class.cpu().numpy()[0]
+        
+        predicted_classes = [classes[str(class_index + 1)] for class_index in top_class]        
+        
+    return top_p, predicted_classes
 
 def test_data(model, test_transforms, sample_image):
     '''Performs validation on the test set'''
@@ -130,9 +137,8 @@ if __name__ == "__main__":
     print('Category names file:', command_args.category_names)
     print('GPU for inference:', command_args.gpu)
     
-    model = models.vgg11(pretrained=True)
     #print(model)
-    checkpoint = load_checkpoint(model, command_args.checkpoint)
+    model = load_checkpoint(command_args.checkpoint)
 
     # data setup
     test_transforms = transforms.Compose([transforms.Resize((224, 224)),
@@ -140,8 +146,6 @@ if __name__ == "__main__":
                                         transforms.ToTensor(),
                                         transforms.Normalize([0.485, 0.456, 0.406],
                                                             [0.229, 0.224, 0.225])])
-    test_set = datasets.ImageFolder('flowers/test' , transform= test_transforms)
-   
 
     # load and resize the image
     image = Image.open(command_args.input)
@@ -154,10 +158,12 @@ if __name__ == "__main__":
         cat_to_name = json.load(f)
         
     # Get tensor from image
-    tensor = process_image(image)   
-    predict(image, model, test_set, cat_to_name, command_args.top_k)
+    tensor = process_image(image, test_transforms)
+    predicted_classes, top_p = predict(tensor, model, cat_to_name, command_args.top_k)
 
     # Display an image along with the top 5 classes   
     ax = imshow(tensor)
+    print(f"Predicted classes: {predicted_classes}")
+    print(f"Probabilities: {top_p}")
 
     image.close()
